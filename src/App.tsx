@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { Area, AreaChart, Brush, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import {
@@ -20,17 +19,11 @@ import {
 } from "@/components/ui/chart";
 import { data as sampleData } from "./data/data";
 import { lttbDownsample } from "./utils/downsampling-algorithm";
+import { useEffect, useRef, useState } from "react";
 
 export const description = "An interactive area chart";
 
 const chartConfig = {
-  visitors: {
-    label: "Visitors",
-  },
-  desktop: {
-    label: "Desktop",
-    color: "var(--chart-1)",
-  },
   value: {
     label: "Value",
     color: "var(--chart-2)",
@@ -38,14 +31,12 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export default function App() {
-  const [data, setData] = React.useState<
-    { time: string; value: number; timestamp: number }[]
-  >([]);
-  const [range, setRange] = React.useState<[number, number] | null>(null);
-  const [visibleDomain, setVisibleDomain] = React.useState<[number, number]>();
-  // const [chartTransition, setChartTransition] = React.useState(true);
-  // const dataChunk = range ? data.slice(...range) : data;
-  const chartRef = React.useRef<HTMLDivElement>(null);
+  const [data, setData] = useState<typeof sampleData & { timestamp: number }[]>(
+    []
+  );
+  const [range, setRange] = useState<[number, number] | null>(null);
+  const [visibleDomain, setVisibleDomain] = useState<[number, number]>();
+  const chartRef = useRef<HTMLDivElement>(null);
   const SCALE_RATIO = 0.95;
 
   const handleZoomIn = (e: Parameters<typeof handleWheel>[0]) => {
@@ -64,8 +55,6 @@ export default function App() {
     const { width, left } = mainChartBouding;
     const currentLength = range[1] - range[0];
     const mouseXRatio = (clientX - left) / width;
-    console.log("mouseXRatio: ", mouseXRatio);
-
     const currentCursorIdx = Math.floor(currentLength * mouseXRatio) + range[0];
     const newLength = Math.floor(currentLength * SCALE_RATIO); // newLength = current * scale. e.g: newLength = 100 * 0.8 = 80
     const newCursorIdx = Math.floor(newLength * mouseXRatio);
@@ -86,7 +75,30 @@ export default function App() {
     console.log("zoom out");
     let newStart: number, newEnd: number;
 
-    if (range[1] - range[0] < 10) {
+    const { clientX } = e;
+    const mainChartBouding = chartRef.current
+      .querySelector(".recharts-cartesian-grid")
+      ?.getBoundingClientRect();
+
+    if (!mainChartBouding) return;
+
+    const { width, left } = mainChartBouding;
+    const currentLength = range[1] - range[0];
+    const mouseXRatio = (clientX - left) / width;
+    console.log("mouseXRatio: ", mouseXRatio);
+
+    const currentCursorIdx = Math.floor(currentLength * mouseXRatio) + range[0];
+    const newLength = Math.floor(currentLength / SCALE_RATIO); // newLength = current / scale. e.g: newLength = 80 / 0.8 = 100
+    const newCursorIdx = Math.floor(newLength * mouseXRatio);
+    newStart = currentCursorIdx - newCursorIdx;
+    newEnd = newStart + newLength;
+
+    if (newEnd - newStart > data.length) return;
+
+    // when too small then scale_ratio can choose correct new chunk.
+    // E.g: [10, 11] -> length = 1, scale = 0.8. floor(1 * 0.8) = still 1 [not good]
+    // Then we will calculate normally, zoom out max 10 points on each side
+    if (newStart === range[0] && newEnd === range[1]) {
       newStart = Math.max(
         0,
         range[0] - Math.min(10, Math.floor(data.length * 0.1))
@@ -96,31 +108,10 @@ export default function App() {
         data.length - 1,
         range[1] + Math.min(10, Math.floor(data.length * 0.1))
       );
-    } else {
-      const { clientX } = e;
-      const mainChartBouding = chartRef.current
-        .querySelector(".recharts-cartesian-grid")
-        ?.getBoundingClientRect();
-
-      if (!mainChartBouding) return;
-
-      const { width, left } = mainChartBouding;
-      const currentLength = range[1] - range[0];
-      const mouseXRatio = (clientX - left) / width;
-      console.log("mouseXRatio: ", mouseXRatio);
-
-      const currentCursorIdx =
-        Math.floor(currentLength * mouseXRatio) + range[0];
-      const newLength = Math.floor(currentLength / SCALE_RATIO); // newLength = current / scale. e.g: newLength = 80 / 0.8 = 100
-      const newCursorIdx = Math.floor(newLength * mouseXRatio);
-      newStart = currentCursorIdx - newCursorIdx;
-      newEnd = newStart + newLength;
-
-      console.log("newStart: ", newStart);
-      console.log("newEnd: ", newEnd);
-
-      if (newEnd - newStart > data.length) return;
     }
+
+    console.log("newStart: ", newStart);
+    console.log("newEnd: ", newEnd);
 
     setRange([newStart, newEnd]);
     setVisibleDomain([data[newStart].timestamp, data[newEnd].timestamp]);
@@ -135,7 +126,7 @@ export default function App() {
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     const downsampledData = lttbDownsample(sampleData, 1000);
     const process = downsampledData.map((d) => ({
       ...d,
@@ -220,21 +211,18 @@ export default function App() {
             />
             <Area
               dataKey="value"
-              type="natural"
+              type="linear"
               fill="url(#fillMobile)"
               stroke="var(--color-value)"
               stackId="a"
-              isAnimationActive={true} // <-- FORCES SMOOTH TRANSITION
-              animationDuration={500}
             />
 
             {/* <Brush
-              dataKey="time"
+              dataKey="timestamp"
               height={30}
               stroke="#8884d8"
-              // optional: define initial selection
-              // startIndex={0}
-              // endIndex={fullData.length - 1}
+              startIndex={range?.[0]}
+              endIndex={range?.[1]}
             /> */}
             <ChartLegend content={<ChartLegendContent />} />
           </AreaChart>
