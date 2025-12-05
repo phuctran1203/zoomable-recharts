@@ -1,6 +1,6 @@
 "use client";
 
-import { Area, AreaChart, Brush, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import {
   Card,
@@ -41,9 +41,8 @@ export default function App() {
 
   const handleZoomIn = (e: Parameters<typeof handleWheel>[0]) => {
     if (!range || !chartRef.current) return;
-    console.log("zoom in");
 
-    console.log("visibleDomain: ", visibleDomain);
+    console.log("zoom in");
 
     const { clientX } = e;
     const mainChartBouding = chartRef.current
@@ -54,12 +53,12 @@ export default function App() {
 
     const { width, left } = mainChartBouding;
     const currentLength = range[1] - range[0];
-    const mouseXRatio = (clientX - left) / width;
+    const mouseXRatio = Math.abs(clientX - left) / width;
     const currentCursorIdx = Math.floor(currentLength * mouseXRatio) + range[0];
     const newLength = Math.floor(currentLength * SCALE_RATIO); // newLength = current * scale. e.g: newLength = 100 * 0.8 = 80
     const newCursorIdx = Math.floor(newLength * mouseXRatio);
-    const newStart = currentCursorIdx - newCursorIdx;
-    const newEnd = newStart + newLength;
+    const newStart = Math.max(0, currentCursorIdx - newCursorIdx);
+    const newEnd = Math.min(data.length - 1, newStart + newLength);
 
     if (newEnd - newStart < 1) return;
 
@@ -72,9 +71,10 @@ export default function App() {
 
   const handleZoomOut = (e: Parameters<typeof handleWheel>[0]) => {
     if (!range || !chartRef.current) return;
-    console.log("zoom out");
-    let newStart: number, newEnd: number;
 
+    console.log("zoom out");
+
+    let newStart: number, newEnd: number;
     const { clientX } = e;
     const mainChartBouding = chartRef.current
       .querySelector(".recharts-cartesian-grid")
@@ -84,14 +84,13 @@ export default function App() {
 
     const { width, left } = mainChartBouding;
     const currentLength = range[1] - range[0];
-    const mouseXRatio = (clientX - left) / width;
-    console.log("mouseXRatio: ", mouseXRatio);
+    const mouseXRatio = Math.abs(clientX - left) / width;
 
     const currentCursorIdx = Math.floor(currentLength * mouseXRatio) + range[0];
     const newLength = Math.floor(currentLength / SCALE_RATIO); // newLength = current / scale. e.g: newLength = 80 / 0.8 = 100
     const newCursorIdx = Math.floor(newLength * mouseXRatio);
-    newStart = currentCursorIdx - newCursorIdx;
-    newEnd = newStart + newLength;
+    newStart = Math.max(0, currentCursorIdx - newCursorIdx);
+    newEnd = Math.min(data.length - 1, newStart + newLength);
 
     if (newEnd - newStart > data.length) return;
 
@@ -118,7 +117,6 @@ export default function App() {
   };
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    // setChartTransition(false);
     if (e.deltaY > 0) {
       handleZoomOut(e);
     } else if (e.deltaY < 0) {
@@ -132,12 +130,14 @@ export default function App() {
       ...d,
       timestamp: new Date(d.time).getTime(),
     }));
+
     setData(process);
     setRange([0, process.length]);
     setVisibleDomain([
       process[0].timestamp,
       process[process.length - 1].timestamp,
     ]);
+
     console.log(process[0].timestamp, process[process.length - 1].timestamp);
   }, []);
 
@@ -183,8 +183,7 @@ export default function App() {
               tickMargin={8}
               minTickGap={32}
               tickFormatter={(value) => {
-                // const date = new Date(Number(value));
-                return value;
+                return new Date(value).toLocaleString();
               }}
               domain={visibleDomain}
               allowDataOverflow={true}
