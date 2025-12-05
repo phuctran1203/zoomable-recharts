@@ -66,8 +66,8 @@ export default function App() {
     console.log("newStart: ", newStart);
     console.log("newEnd: ", newEnd);
 
-    // setRange([newStart, newEnd]);
-    // setVisibleDomain([data[newStart].timestamp, data[newEnd].timestamp]);
+    setRange([newStart, newEnd]);
+    setVisibleDomain([data[newStart].timestamp, data[newEnd].timestamp]);
   };
 
   const handleZoomOut = (e: Parameters<typeof handleWheel>[0]) => {
