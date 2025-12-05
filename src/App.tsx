@@ -46,7 +46,7 @@ export default function App() {
   // const [chartTransition, setChartTransition] = React.useState(true);
   // const dataChunk = range ? data.slice(...range) : data;
   const chartRef = React.useRef<HTMLDivElement>(null);
-  const SCALE_RATIO = 20;
+  const SCALE_RATIO = 0.95;
 
   const handleZoomIn = (e: Parameters<typeof handleWheel>[0]) => {
     if (!range || !chartRef.current) return;
@@ -56,57 +56,74 @@ export default function App() {
 
     const { clientX } = e;
     const mainChartBouding = chartRef.current
-      .querySelector(".recharts-area")
+      .querySelector(".recharts-cartesian-grid")
       ?.getBoundingClientRect();
 
     if (!mainChartBouding) return;
 
     const { width, left } = mainChartBouding;
-    const widthLeft = clientX - left;
-    const leftRatio = widthLeft / width;
-    const rightRatio = 1 - leftRatio;
     const currentLength = range[1] - range[0];
-    const start = Math.min(
-      range[0] + Math.floor((currentLength * leftRatio) / SCALE_RATIO),
-      data.length - 2
-    );
-    const end = Math.max(
-      0,
-      range[1] - Math.floor((currentLength * rightRatio) / SCALE_RATIO)
-    );
+    const mouseXRatio = (clientX - left) / width;
+    console.log("mouseXRatio: ", mouseXRatio);
 
-    if (start >= end) return;
-    setRange([start, end]);
-    setVisibleDomain([data[start].timestamp, data[end].timestamp]);
+    const currentCursorIdx = Math.floor(currentLength * mouseXRatio) + range[0];
+    const newLength = Math.floor(currentLength * SCALE_RATIO); // newLength = current * scale. e.g: newLength = 100 * 0.8 = 80
+    const newCursorIdx = Math.floor(newLength * mouseXRatio);
+    const newStart = currentCursorIdx - newCursorIdx;
+    const newEnd = newStart + newLength;
+
+    if (newEnd - newStart < 1) return;
+
+    console.log("newStart: ", newStart);
+    console.log("newEnd: ", newEnd);
+
+    setRange([newStart, newEnd]);
+    setVisibleDomain([data[newStart].timestamp, data[newEnd].timestamp]);
   };
 
   const handleZoomOut = (e: Parameters<typeof handleWheel>[0]) => {
     if (!range || !chartRef.current) return;
     console.log("zoom out");
+    let newStart: number, newEnd: number;
 
-    const { clientX } = e;
-    const mainChartBouding = chartRef.current
-      .querySelector(".recharts-area")
-      ?.getBoundingClientRect();
+    if (range[1] - range[0] < 10) {
+      newStart = Math.max(
+        0,
+        range[0] - Math.min(10, Math.floor(data.length * 0.1))
+      );
 
-    if (!mainChartBouding) return;
+      newEnd = Math.min(
+        data.length - 1,
+        range[1] + Math.min(10, Math.floor(data.length * 0.1))
+      );
+    } else {
+      const { clientX } = e;
+      const mainChartBouding = chartRef.current
+        .querySelector(".recharts-cartesian-grid")
+        ?.getBoundingClientRect();
 
-    const { width, left } = mainChartBouding;
-    const widthLeft = clientX - left;
-    const leftRatio = widthLeft / width;
-    const rightRatio = 1 - leftRatio;
+      if (!mainChartBouding) return;
 
-    const start = Math.max(
-      0,
-      range[0] - Math.floor((data.length * leftRatio) / SCALE_RATIO)
-    );
-    const end = Math.min(
-      range[1] + Math.floor((data.length * rightRatio) / SCALE_RATIO),
-      data.length - 1
-    );
+      const { width, left } = mainChartBouding;
+      const currentLength = range[1] - range[0];
+      const mouseXRatio = (clientX - left) / width;
+      console.log("mouseXRatio: ", mouseXRatio);
 
-    setRange([start, end]);
-    setVisibleDomain([data[start].timestamp, data[end].timestamp]);
+      const currentCursorIdx =
+        Math.floor(currentLength * mouseXRatio) + range[0];
+      const newLength = Math.floor(currentLength / SCALE_RATIO); // newLength = current / scale. e.g: newLength = 80 / 0.8 = 100
+      const newCursorIdx = Math.floor(newLength * mouseXRatio);
+      newStart = currentCursorIdx - newCursorIdx;
+      newEnd = newStart + newLength;
+
+      console.log("newStart: ", newStart);
+      console.log("newEnd: ", newEnd);
+
+      if (newEnd - newStart > data.length) return;
+    }
+
+    setRange([newStart, newEnd]);
+    setVisibleDomain([data[newStart].timestamp, data[newEnd].timestamp]);
   };
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
